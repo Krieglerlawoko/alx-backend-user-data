@@ -132,3 +132,6 @@ def main() -> None:
 
     cursor.close()
     db.close()
+
+if __name__ == '__main__':
+    main()
