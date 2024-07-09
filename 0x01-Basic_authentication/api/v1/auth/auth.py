@@ -6,9 +6,6 @@ class Auth:
     """Authentication class to
     manage the API's auth mechanism."""
 
-    def __init__(self):
-        pass
-
     def require_auth(self, path: str, excluded_paths: List[str]) -> bool:
         """
         Method to determine if authentication
