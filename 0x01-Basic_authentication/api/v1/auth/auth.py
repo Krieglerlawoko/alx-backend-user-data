@@ -19,14 +19,17 @@ class Auth:
             bool: True if authentication is
             required, False otherwise.
         """
-        if path is None:
+        if not path or not excluded_paths:
             return True
 
-        if excluded_paths is None or not excluded_paths:
-            return True
+        path_has_trailing_slash = path.endswith('/')
+        tmp_path = path if path_has_trailing_slash else path + '/'
 
-        for excluded_path in excluded_paths:
-            if fnmatch.fnmatch(path, excluded_path):
+        for exc_path in excluded_paths:
+            if exc_path.endswith('*'):
+                if path.startswith(exc_path[:-1]):
+                    return False
+            elif path.rstrip('/') == exc_path.rstrip('/'):
                 return False
 
         return True
