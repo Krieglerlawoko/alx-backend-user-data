@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 """
-Users views module.
+Module of User views
 """
 import os
-from flask import jsonify, request, abort
+from flask import abort, jsonify, request
 from api.v1.views import app_views
 from models.user import User
 
 
 @app_views.route('/auth_session/login', methods=['POST'], strict_slashes=False)
-def auth_session_login() -> str:
+def auth_session():
     """
-    Handles user login.
-
+    Handle user login
     Returns:
-        JSON response containing user details if authentication is successful,
-        or an error message otherwise.
+        - Dictionary representation of user if found, else error message
     """
     email = request.form.get('email')
     password = request.form.get('password')
 
     if not email:
         return jsonify({"error": "email missing"}), 400
+
     if not password:
         return jsonify({"error": "password missing"}), 400
 
     users = User.search({"email": email})
+
     if not users:
         return jsonify({"error": "no user found for this email"}), 404
 
@@ -46,15 +46,11 @@ def auth_session_login() -> str:
     methods=['DELETE'],
     strict_slashes=False
 )
-def auth_session_logout() -> str:
+def handle_logout():
     """
-    Handles user logout.
-
-    Returns:
-        JSON response indicating successful logout, or an error message.
+    Handle user logout
     """
     from api.v1.app import auth
     if auth.destroy_session(request):
         return jsonify({}), 200
-
     abort(404)
