@@ -1,102 +1,118 @@
 #!/usr/bin/env python3
 """
-Flask app module
+A simple Flask app with user authentication features.
 """
-from flask import Flask, request, jsonify, abort
+
+import logging
+from flask import Flask, abort, jsonify, redirect, request
 from auth import Auth
-from sqlalchemy.exc import NoResultFound
 
+logging.disable(logging.WARNING)
+
+AUTH = Auth()
 app = Flask(__name__)
-auth = Auth()
 
 
-@app.route("/", methods=["GET"])
-def index():
-    """Root endpoint"""
-    return jsonify({"message": "Bienvenue"})
+@app.route("/", methods=["GET"], strict_slashes=False)
+def index() -> str:
+    """GET /
+    Returns:
+        JSON payload containing a welcome message.
+    """
+    return jsonify({"message": "Welcome"})
 
 
-@app.route("/users", methods=["POST"])
-def users():
-    """Endpoint to register a new user"""
+@app.route("/users", methods=["POST"], strict_slashes=False)
+def register_user() -> str:
+    """POST /users
+    Registers a new user.
+    Returns:
+        JSON payload with registered email or error message.
+    """
+    email, password = request.form.get("email"), request.form.get("password")
     try:
-        email = request.form['email']
-        password = request.form['password']
-        user = auth.register_user(email, password)
-        return jsonify({"email": user.email, "message": "user created"}), 200
-    except ValueError as e:
-        return jsonify({"message": str(e)}), 400
+        AUTH.register_user(email, password)
+        return jsonify({"email": email, "message": "User created"})
+    except ValueError:
+        return jsonify({"message": "Email already registered"}), 400
 
 
-@app.route("/sessions", methods=["POST"])
-def sessions():
-    """Endpoint to log in and create a session"""
-    try:
-        email = request.form['email']
-        password = request.form['password']
-        if auth.valid_login(email, password):
-            session_id = auth.create_session(email)
-            response = jsonify({"email": email, "message": "logged in"})
-            response.set_cookie('session_id', session_id)
-            return response, 200
-        else:
-            abort(401)
-    except NoResultFound:
+@app.route("/sessions", methods=["POST"], strict_slashes=False)
+def login() -> str:
+    """POST /sessions
+    Logs in a user.
+    Returns:
+        JSON payload indicating successful login or unauthorized access.
+    """
+    email, password = request.form.get("email"), request.form.get("password")
+    if not AUTH.valid_login(email, password):
         abort(401)
+    session_id = AUTH.create_session(email)
+    response = jsonify({"email": email, "message": "Logged in"})
+    response.set_cookie("session_id", session_id)
+    return response
 
 
-@app.route("/sessions", methods=["DELETE"])
-def delete_sessions():
-    """Endpoint to log out and delete session"""
-    try:
-        session_id = request.cookies.get('session_id')
-        user = auth.get_user_from_session_id(session_id)
-        if user:
-            auth.destroy_session(user.id)
-            return index()
-        else:
-            abort(403)
-    except NoResultFound:
+@app.route("/sessions", methods=["DELETE"], strict_slashes=False)
+def logout() -> str:
+    """DELETE /sessions
+    Logs out the current user.
+    Returns:
+        Redirects to the home route after logging out.
+    """
+    session_id = request.cookies.get("session_id")
+    user = AUTH.get_user_from_session_id(session_id)
+    if user is None:
         abort(403)
+    AUTH.destroy_session(user.id)
+    return redirect("/")
 
 
-@app.route("/profile", methods=["GET"])
-def profile():
-    """Endpoint to retrieve user profile"""
-    try:
-        session_id = request.cookies.get('session_id')
-        user = auth.get_user_from_session_id(session_id)
-        if user:
-            return jsonify({"email": user.email}), 200
-        else:
-            abort(403)
-    except NoResultFound:
+@app.route("/profile", methods=["GET"], strict_slashes=False)
+def profile() -> str:
+    """GET /profile
+    Retrieves user profile information.
+    Returns:
+        JSON payload containing user's email.
+    """
+    session_id = request.cookies.get("session_id")
+    user = AUTH.get_user_from_session_id(session_id)
+    if user is None:
         abort(403)
+    return jsonify({"email": user.email})
 
 
-@app.route("/reset_password", methods=["POST"])
-def reset_password():
-    """Endpoint to initiate password reset"""
+@app.route("/reset_password", methods=["POST"], strict_slashes=False)
+def request_reset_password() -> str:
+    """POST /reset_password
+    Initiates the password reset process.
+    Returns:
+        JSON payload containing email and reset token.
+    """
+    email = request.form.get("email")
     try:
-        email = request.form['email']
-        reset_token = auth.get_reset_password_token(email)
-        return jsonify({"email": email, "reset_token": reset_token}), 200
+        reset_token = AUTH.get_reset_password_token(email)
     except ValueError:
         abort(403)
+    return jsonify({"email": email, "reset_token": reset_token})
 
 
-@app.route("/reset_password", methods=["PUT"])
-def update_password():
-    """Endpoint to update password using reset token"""
+@app.route("/reset_password", methods=["PUT"], strict_slashes=False)
+def update_password() -> str:
+    """PUT /reset_password
+    Updates user's password after reset.
+    Returns:
+        JSON payload
+    """
+    email = request.form.get("email")
+    reset_token = request.form.get("reset_token")
+    new_password = request.form.get("new_password")
     try:
-        email = request.form['email']
-        reset_token = request.form['reset_token']
-        password = request.form['password']
-        auth.update_password(reset_token, password)
-        return jsonify({"email": email, "message": "password updated"}), 200
+        AUTH.update_password(reset_token, new_password)
     except ValueError:
         abort(403)
+    return jsonify({"email": email, "message": "Password updated"})
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port="5000")
+    app.run(host="0.0.0.0", port=5000)
